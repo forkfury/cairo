@@ -83,12 +83,28 @@ impl NonZeroCopy<T> of Copy<NonZero<T>>;
 impl NonZeroDrop<T> of Drop<NonZero<T>>;
 
 pub(crate) mod non_zero_neg {
+    // Fallback implementation for types that don't support bounded integer optimization
     pub impl Impl<T, +Neg<T>, +TryInto<T, NonZero<T>>> of Neg<NonZero<T>> {
         fn neg(a: NonZero<T>) -> NonZero<T> {
-            // TODO(orizi): Optimize using bounded integers.
             let value: T = a.into();
             let negated: T = -value;
             negated.try_into().unwrap()
+        }
+    }
+
+    // Optimized implementation using bounded integers for signed integer types
+    #[feature("bounded-int-utils")]
+    mod bounded {
+        use crate::internal::bounded_int::{NegateHelper, upcast};
+
+        pub impl BoundedImpl<
+            T,
+            impl NegateHelperImpl: NegateHelper<NonZero<T>>,
+        > of super::super::Neg<NonZero<T>> {
+            #[inline]
+            fn neg(a: NonZero<T>) -> NonZero<T> {
+                upcast(NegateHelperImpl::negate(a))
+            }
         }
     }
 }
