@@ -94,9 +94,22 @@ pub fn load_cached_crate_modules<'db>(
         return Default::default();
     };
 
+    // Check that we have enough bytes to read the size header
+    if content.len() < 8 {
+        return Default::default();
+    }
+
     let size = usize::from_be_bytes(content[..8].try_into().unwrap());
 
-    let content = &content[8..size + 8];
+    // Check for overflow and that we have enough data
+    let Some(data_end) = size.checked_add(8) else {
+        return Default::default();
+    };
+    if data_end > content.len() {
+        return Default::default();
+    }
+
+    let content = &content[8..data_end];
 
     let (metadata, module_data, defs_lookups): DefCache<'_> = postcard::from_bytes(content)
         .unwrap_or_else(|e| {
